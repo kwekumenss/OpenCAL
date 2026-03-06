@@ -1,74 +1,79 @@
 import os
+import subprocess
+from pathlib import path
 
 
 class MP4Driver:
-    def __init__(self, mount_point: str = "/media/opencal"):
-        # Initialize the MP4Driver with a specified mount point for the USB storage
-        # TODO: use Path
-        self.mount_point: str = mount_point
+    def __init__(self, mount_point: str = "/media"):
+        # Initialize with a base mount point. 
+        # Using '/media' allows the driver to find USBs regardless of the username.
+        self.mount_point = Path(mount_point)
 
+    
     def list_mp4_files(self) -> list[str]:
         """
-        List all MP4 files in the USB storage device directory.
+        List all MP4 files found dynamically in any subfolder of the mount point.
         Returns a list of file names (strings).
+        Addresses the static pathing bug by searching recursively.
         """
+        if not self.mount_point.exists():
+            return []
 
-        # TODO: Use Path
-        mp4_files: list[str] = []
-        # Check if the mount point exists
-        if not os.path.exists(self.mount_point):
-            raise FileNotFoundError(f"Mount point {self.mount_point} not found.")
+        # Uses rglob for recursive, case-insensitive-like search (TODO: Use Path)
+        # Finds .mp4 and .MP4 files
+        return [str(p) for p in self.mount_point.rglob("*.[mM][pP]4")]
 
-        # Walk through the directory and find mp4 files
-        for root, _dirs, files in os.walk(self.mount_point):
-            for file in files:
-                # Case-insensitive check for .mp4 file extension
-                if file.lower().endswith(".mp4"):
-                    # Append the full path of the file to the list
-                    mp4_files.append(os.path.join(root, file))
-
-        return mp4_files
-
-    def get_file_names(self):
-        """
-        Return only the file names (without paths).
-        """
-        # Get the list of full MP4 file paths and extract just the file names
-        mp4_files = self.list_mp4_files()
-        return [os.path.basename(file) for file in mp4_files]
+    def get_file_names(self) -> list[str]:
+        """Return only the file names (without paths)."""
+        return [os.path.basename(f) for f in self.list_mp4_files()]
 
     def print_mp4_files(self):
-        """
-        Print the names of all MP4 files found.
-        """
-        # Retrieve the list of MP4 file names
-        mp4_files = self.get_file_names()
-        if not mp4_files:
+        """Print the names of all MP4 files found."""
+        files = self.get_file_names()
+        if not files:
             print("No MP4 files found.")
         else:
             print("MP4 Files found:")
-            # Print each file name
-            for file in mp4_files:
-                print(file)
+            for f in files:
+                print(f)
 
     def get_full_path(self, filename: str) -> str:
         """
-        Given a filename (as returned by get_file_names), return the full path to the file.
-        Raises FileNotFoundError if the file is not found.
+        Returns the full system path for a given filename.
+        Crucial for passing paths to the Projector module.
         """
-        # TODO: Use Path?
-
-        # Search for the full path of the specified file name
         for full_path in self.list_mp4_files():
             if os.path.basename(full_path) == filename:
                 return full_path
-        raise FileNotFoundError(f"File {filename} not found in {self.mount_point}")
+        raise FileNotFoundError(f"File {filename} not found.")
 
+    def safe_eject(self) -> bool:
+        """
+        Safely unmounts USB drives found in the mount point.
+        Call this from the Rotary Encoder 'click' event.
+        """
+        try:
+            # Identify subdirectories (the actual mounted drives)
+            mounts = [p for p in self.mount_point.iterdir() if p.is_dir()]
+            
+            for mnt in mounts:
+                # Sync ensures all data is written before unmounting
+                subprocess.run(["/usr/bin/sync"], check=True)
+                # Unmount the specific drive
+                subprocess.run(["/usr/bin/umount", str(mnt)], check=True)
+                print(f"Safe to remove drive at: {mnt}")
+            return True
+        except subprocess.CalledProcessError:
+            print("Eject failed: Drive is likely busy (video still playing?)")
+            return False
+        except Exception as e:
+            print(f"Error during eject: {e}")
+            return False
 
 # Example Usage:
 if __name__ == "__main__":
     # Create an MP4Driver instance with the USB mount point
-    driver = MP4Driver(mount_point="/media/opencal")
+    driver = MP4Driver(mount_point="/media")
 
     # List MP4 file names
     mp4_files = driver.get_file_names()
