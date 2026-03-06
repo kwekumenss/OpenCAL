@@ -44,6 +44,7 @@ class LCDGui:
             ],  # Options for adjusting variables
             "Power Options": [
                 "back",
+                "Eject USB",
                 "Kill GUI",
                 "Power Off",
             ],
@@ -56,6 +57,7 @@ class LCDGui:
             "Turn off LEDs": self.pc.hardware.led_array.clear_leds,
             "start stepper": lambda: self.pc.hardware.stepper.start_rotation(),
             "stop stepper": lambda: self.pc.hardware.stepper.stop(),
+            "Eject USB": lambda: self.handle_safe_eject()
             "Kill GUI": lambda: self.kill_gui(),
             "Set Step RPM": lambda: self.enter_variable_adjustment(
                 "RPM",
@@ -116,6 +118,35 @@ class LCDGui:
         self.selected_video_filename = None
         self.video_filename_short = None
 
+    def handle_safe_eject(self):
+        """Stops hardware and safely unmounts the USB."""
+        # 1. Provide immediate feedback
+        self.pc.hardware.lcd.clear()
+        self.pc.hardware.lcd.write_message("Ejecting USB...", row=1)
+    
+        # 2. Safety Check: Stop the print job or projector
+        # This releases the file lock on the USB
+        if self.pc.running:
+            self.pc.stop()
+            self.clear_timer()
+        else:
+            self.pc.hardware.projector.stop_video()
+    
+        # 3. Attempt Eject
+        success = self.pc.hardware.usb_device.safe_eject()
+    
+        # 4. Final Status
+        self.pc.hardware.lcd.clear()
+        if success:
+            self.pc.hardware.lcd.write_message("Safe to Remove", row=1)
+            time.sleep(2)
+            self.show_menu("main")
+        else:
+            self.pc.hardware.lcd.write_message("Eject Failed!", row=1)
+            self.pc.hardware.lcd.write_message("Drive Busy", row=2)
+            time.sleep(2)
+            self.navigate()
+        
     def clear_timer(self):
         # Reset the timer attribute
         self.print_start_time = None
