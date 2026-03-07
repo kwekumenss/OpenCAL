@@ -57,7 +57,7 @@ class LCDGui:
             "Turn off LEDs": self.pc.hardware.led_array.clear_leds,
             "start stepper": lambda: self.pc.hardware.stepper.start_rotation(),
             "stop stepper": lambda: self.pc.hardware.stepper.stop(),
-            "Eject USB": lambda: self.handle_safe_eject()
+            "Eject USB": lambda: self.handle_safe_eject(),
             "Kill GUI": lambda: self.kill_gui(),
             "Set Step RPM": lambda: self.enter_variable_adjustment(
                 "RPM",
