@@ -6,8 +6,6 @@ def main():
 
     # Pass print_controller to the GUI
     gui = LCDGui()
-    hardware = HardwareController()
-    printer = PrintController()
 
     # Start GUI in separate thread
     gui_thread = threading.Thread(target=gui.run, daemon=True)
