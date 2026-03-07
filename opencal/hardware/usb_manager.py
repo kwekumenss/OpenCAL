@@ -1,6 +1,6 @@
 import os
 import subprocess
-from pathlib import path
+from pathlib import Path
 
 
 class MP4Driver:
